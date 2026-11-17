@@ -18,6 +18,9 @@ pub struct BevyManifest {
 }
 
 const BEVY: &str = "bevy";
+/// Zetta: the Z3D engine crate, and where it re-exports Bevy.
+const Z3D_ENGINE: &str = "z3d_engine";
+const Z3D_ENGINE_BEVY: &str = "z3d_engine::bevy";
 
 impl BevyManifest {
     /// Calls `f` with a global shared instance of the [`BevyManifest`] struct.
@@ -89,6 +92,10 @@ impl BevyManifest {
                 return Some(Self::parse_str(&rust_name));
             } else if deps.get(BEVY).is_some() {
                 BEVY
+            } else if deps.get(Z3D_ENGINE).is_some() {
+                // Zetta: Z3D games depend only on `z3d_engine`, which re-exports Bevy as
+                // `z3d_engine::bevy`, so derives in game code resolve through it.
+                Z3D_ENGINE_BEVY
             } else {
                 // Note: to support bevy crate aliases, we could do scanning here to find a crate with a "package" name that
                 // matches our request, but that would then mean we are scanning every dependency (and dev dependency) for every
