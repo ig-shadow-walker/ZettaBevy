@@ -46,6 +46,8 @@ members = [
 exclude = [
   # Integration tests are not part of the workspace
   "tests-integration",
+  # Z3D: patched copies of Bevy's dependencies (see patches/README.md)
+  "patches",
 ]
 
 [workspace.lints.clippy]
@@ -5812,3 +5814,7 @@ bevy_pbr = { path = "crates/bevy_pbr" }
 bevy_core_pipeline = { path = "crates/bevy_core_pipeline" }
 bevy_sprite_render = { path = "crates/bevy_sprite_render" }
 bevy_ui_render = { path = "crates/bevy_ui_render" }
+
+# Z3D: Bevy's own builds use the patched winit too (see patches/README.md).
+[patch.crates-io]
+winit = { path = "patches/winit" }

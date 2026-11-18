@@ -440,6 +440,13 @@ pub(crate) fn attempt_grab(
         return Err(ExternalError::Ignored);
     }
 
+    // Phones and tablets have no cursor, so there's nothing to release. winit reports
+    // the attempt as an error, which would be logged for every game at startup.
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    if grab_mode == CursorGrabMode::None {
+        return Ok(());
+    }
+
     let grab_result = match grab_mode {
         CursorGrabMode::None => winit_window.set_cursor_grab(WinitCursorGrabMode::None),
         CursorGrabMode::Confined => winit_window
