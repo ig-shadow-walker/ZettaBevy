@@ -36,8 +36,28 @@ pub struct UiRootNodes<'w, 's> {
     ui_children: UiChildren<'w, 's>,
 }
 
+/// System param that allows iteration of all UI root nodes.
+///
+/// A UI root node is a [`Node`] without a [`ChildOf`], or whose parent isn't a [`Node`]
+/// (such as a node in a scene, under the scene's root entity).
 #[cfg(not(feature = "ghost_nodes"))]
-pub type UiRootNodes<'w, 's> = Query<'w, 's, Entity, (With<Node>, Without<ChildOf>)>;
+#[derive(SystemParam)]
+pub struct UiRootNodes<'w, 's> {
+    nodes_query: Query<'w, 's, (Entity, Option<&'static ChildOf>), With<Node>>,
+    all_nodes_query: Query<'w, 's, (), With<Node>>,
+}
+
+#[cfg(not(feature = "ghost_nodes"))]
+impl<'w, 's> UiRootNodes<'w, 's> {
+    pub fn iter(&'s self) -> impl Iterator<Item = Entity> + 's {
+        self.nodes_query
+            .iter()
+            .filter(|(_, child_of)| {
+                child_of.is_none_or(|child_of| !self.all_nodes_query.contains(child_of.parent()))
+            })
+            .map(|(entity, _)| entity)
+    }
+}
 
 #[cfg(feature = "ghost_nodes")]
 impl<'w, 's> UiRootNodes<'w, 's> {
@@ -150,9 +170,13 @@ impl<'w, 's> UiChildren<'w, 's> {
             .copied()
     }
 
-    /// Returns the UI parent of the provided entity.
+    /// Returns the UI parent of the provided entity (none when its parent isn't a [`Node`]).
     pub fn get_parent(&'s self, entity: Entity) -> Option<Entity> {
-        self.parents_query.get(entity).ok().map(ChildOf::parent)
+        self.parents_query
+            .get(entity)
+            .ok()
+            .map(ChildOf::parent)
+            .filter(|parent| self.ui_children_query.contains(*parent))
     }
 
     /// Given an entity in the UI hierarchy, check if its set of children has changed, e.g if children has been added/removed or if the order has changed.

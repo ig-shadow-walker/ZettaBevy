@@ -37,6 +37,8 @@ mod struct_utility;
 mod trait_reflection;
 mod type_data;
 mod type_path;
+#[cfg(feature = "auto_register")]
+mod z3d_keep;
 mod where_clause_options;
 
 use std::{fs, io::Read, path::PathBuf};

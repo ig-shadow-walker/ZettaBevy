@@ -174,6 +174,13 @@ impl RemoteHttpPlugin {
         self.port = port;
         self
     }
+    /// Set the remote port that the server for the render subapp will listen on.
+    // Z3D: lets several apps run at once, each on its own pair of ports.
+    #[must_use]
+    pub fn with_render_port(mut self, port: u16) -> Self {
+        self.render_port = port;
+        self
+    }
     /// Set the extra headers that the response will include.
     ///
     /// ////// /// # Example
@@ -255,12 +262,16 @@ async fn server_main(
     request_sender: Sender<BrpMessage>,
     headers: Headers,
 ) -> AnyhowResult<()> {
-    listen(
-        Async::<TcpListener>::bind((address, port))?,
-        &request_sender,
-        &headers,
-    )
-    .await
+    // Z3D: say when the port can't be taken (another program has it), instead of the
+    // server quietly not running; tools waiting for an answer can then pick another port.
+    let listener = match Async::<TcpListener>::bind((address, port)) {
+        Ok(listener) => listener,
+        Err(error) => {
+            bevy_log::error!("The remote server couldn't listen on {address}:{port}: {error}");
+            return Err(error.into());
+        }
+    };
+    listen(listener, &request_sender, &headers).await
 }
 
 async fn listen(

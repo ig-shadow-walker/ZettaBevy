@@ -31,3 +31,41 @@ It's the change proposed to winit in
 backported to 0.30.13. The rest of the folder is winit 0.30.13 as published.
 
 **Remove it when** Bevy depends on a winit release with UIScene support.
+
+## wgpu-hal 30.0.2
+
+wgpu-hal is the part of wgpu (Bevy's GPU library) that talks to each graphics API; this
+patch only changes its Metal backend (Mac, iPhone, iPad).
+
+**The problem:** wgpu opens a new Metal command buffer for every render or compute pass,
+plus one for the barriers before it and one for each submitted command buffer's resource
+transitions. On Metal, barriers and transitions do nothing, so most of those command
+buffers are empty, but each still costs CPU and GPU time, and Metal allows at most 4,096
+waiting at once. Bevy draws each shadow view (six per point light) with about five passes
+of its own, so a scene with a few dozen shadowed point lights went past the limit, which
+wgpu treats as a lost device: the game quit. Below the limit, frames were slow: 8
+shadowed point lights took 22 ms per frame on an M4 Pro.
+
+**The fix:** a Metal command buffer is created when something is first recorded into
+it, not when encoding starts; encodings that record nothing have none, and submitting
+skips them. 8 shadowed point lights now take 8 ms per frame, and 72 shadowed lights run
+(they crashed before). Every scene in `Z3D-Engine/benchmarks/big-scenes` got faster;
+the city scene's frames took half as long.
+
+**What changed** compared with wgpu-hal 30.0.2 from crates.io, all in `src/metal/`:
+
+- `mod.rs`: `CommandEncoder` keeps the label for a command buffer it hasn't created yet
+  (`pending_label`) and the debug groups pushed before it existed (`skipped_debug_groups`);
+  `CommandBuffer::raw` is an `Option` (none when nothing was recorded); `Queue::submit`
+  commits only real command buffers and signals the fence on the last real one.
+- `command.rs`: `begin_encoding` only remembers the label (or creates the command buffer
+  at once when strict event sync is on, whose wait value has to be read then);
+  `cmd_buf()` creates it on first use, with the 4,096 limit check `begin_encoding` had;
+  every place that used the command buffer goes through `cmd_buf()`; residency sets and
+  dropping skip encodings that recorded nothing.
+- `device.rs`: the new fields start empty.
+
+The rest of the folder is wgpu-hal 30.0.2 as published.
+
+**Remove it when** wgpu stops opening a Metal command buffer per pass (or creates them
+lazily itself) and Bevy moves to that version.

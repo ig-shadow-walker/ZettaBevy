@@ -246,12 +246,31 @@ pub fn reflect_auto_registration(meta: &ReflectMeta) -> Option<proc_macro2::Toke
         not(feature = "auto_register_static")
     ))]
     {
-        Some(quote! {
+        let submit = quote! {
             #bevy_reflect_path::__macro_exports::auto_register::inventory::submit!{
                 #bevy_reflect_path::__macro_exports::auto_register::AutomaticReflectRegistrations(
                     <#type_path as #bevy_reflect_path::__macro_exports::auto_register::RegisterForReflection>::__register
                 )
             }
-        })
+        };
+        // Z3D: in games built with `--cfg z3d_reflect_trim` (z3d's exports), Bevy's own types
+        // register themselves only when the build keeps them (`--cfg z3d_keep="<Type>"`, from
+        // the types the game's files name; `--cfg z3d_models` for what glTF models need) or
+        // they're in `z3d_keep::ALWAYS`. Registering a
+        // type keeps all of its reflection code in the game, and a game uses few of Bevy's
+        // hundreds of types. Other crates' types (the game's, z3d's, physics engines') always
+        // register themselves.
+        let crate_name = std::env::var("CARGO_CRATE_NAME").unwrap_or_default();
+        if let Some(ident) = type_path.get_ident().map(ToString::to_string)
+            && crate::z3d_keep::trimmable(&crate_name, &ident)
+        {
+            let models = if crate::z3d_keep::for_models(&ident) { quote!(z3d_models,) } else { quote!() };
+            return Some(quote! {
+                #[allow(unexpected_cfgs)]
+                #[cfg(any(not(z3d_reflect_trim), #models z3d_keep = #ident))]
+                const _: () = { #submit };
+            });
+        }
+        Some(submit)
     }
 }

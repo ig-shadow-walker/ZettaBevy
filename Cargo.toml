@@ -5818,3 +5818,4 @@ bevy_ui_render = { path = "crates/bevy_ui_render" }
 # Z3D: Bevy's own builds use the patched winit too (see patches/README.md).
 [patch.crates-io]
 winit = { path = "patches/winit" }
+wgpu-hal = { path = "patches/wgpu-hal" }
